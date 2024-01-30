@@ -1,66 +1,70 @@
-// Polyfill for Promise.all
-const p1 = new Promise((resolve) => resolve(10));
-const p2 = new Promise((resolve) => resolve(15));
-const p3 = new Promise((resolve) => reject(19));
-
-const listPromise = [p1, p2, p3];
-
-promiseAll = (promises) => {
-  return new Promise((resolve, reject) => {
-    const res = [];
-    let c = 0;
-    promises.forEach((p, idx) => {
-      p.then((resp) => {
-        c++;
-        res.push(resp);
-        if (c === promises.length - 1) resolve(res);
-      }).catch((err) => reject(err));
+function delayOrReject(ms, shouldReject, num) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (shouldReject) {
+                reject(`Promise rejected ${num}`);
+            } else {
+                resolve(`Promise resolved ${num}`);
+            }
+        }, ms);
     });
-  });
-};
+}
 
-const promiseAllSettled = function (promises) {
-  return new Promise((resolve, reject) => {
-    let res = [];
-    let c = 0;
+// An array of promises, including one that resolves and one that rejects
+const promises = [
+    delayOrReject(2000, false, 1),
+    delayOrReject(3000, true, 2),
+    delayOrReject(1500, false, 3)
+];
 
-    promises.forEach((p) => {
-      p.then((value) => {
-        res.push({ status: "fulfilled", value: value });
-      })
-        .catch((reason) => {
-          res.push({ status: "rejected", reason: reason });
+const promiseAll = function(promises){
+    return new Promise((resolve, reject) => {
+        let results = [];
+        let c = 0;
+        promises.forEach((pr, idx) => {
+            pr.then((res) => {
+                c++
+                results.push(res)
+                if(c == promises.length) resolve(results)
+            }).catch((err) => reject(err))
         })
-        .finally(() => {
-          c++;
-          if (c == promises.length) {
-            resolve(res);
-          }
-        });
-    });
-  });
-};
+    })
+}
 
-const PromiseRace = function (promises) {
-  return new Promise((resolve, reject) => {
-    let resolved = false;
+const promiseAllSettled = function(promises){
+    return new Promise((resolve, reject) => {
+        let results = [];
+        let c = 0;
+        promises.forEach((pr, idx) => {
+            // idx to maintain order
+            Promise.resolve(pr).then((res) => {
+                results[idx] = { value: res, status: "fulfilled" }
+            }).catch((err) => {
+                results[idx] = { reason: err, status: "rejected" }
+            }).finally(() => {
+                c++;
+                if(c==promises.length) resolve(results)
+            })
+        })
+    })
+}
 
-    promises.forEach((p) => {
-      p.then((resp) => {
-        if (!resolved) {
-          resolved = true;
-          resolve(resp);
-        }
-      }).catch((err) => {
-        if (!resolved) {
-          resolved = true;
-          reject(err);
-        }
-      });
-    });
-  });
-};
-
-promiseAll(listPromise)
-  .then((resp) => console.log(resp))
-  .catch((err) => console.log(err));
+const promiseRace = function(promises){
+    return new Promise((resolve, reject) => {
+        let resolved = false;
+        
+        promises.forEach((pr) => {
+            pr.then((res) => {
+                if(!resolved){
+                    resolved = true
+                    resolve(res)
+                }
+            }).catch((err) => {
+                if(!resolved){
+                    resolved = true
+                    reject(err)
+                }
+            })
+        })
+    })
+}
